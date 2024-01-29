@@ -28,7 +28,7 @@ func TestChannelClose(t *testing.T) {
 	var ch Channel[int]
 	c := make(chan int, 1)
 
-	closer := ch.Subscribe(c)
+	_, closer := ch.Subscribe(c)
 	closer()
 
 	_, ok := <-c
@@ -83,7 +83,7 @@ func TestCloser(t *testing.T) {
 	var ch Channel[int]
 	c := make(chan int, 1)
 
-	closer := ch.Subscribe(c)
+	_, closer := ch.Subscribe(c)
 
 	ch.Publish(42)
 
@@ -115,4 +115,13 @@ func TestBackPressureWithMultipleReceivers(t *testing.T) {
 	// Check that c2 was closed due to backpressure
 	_, ok = <-c2
 	assert.False(t, ok, "Expected channel to be closed due to backpressure")
+}
+
+func TestSubscribeWithLastValue(t *testing.T) {
+	var ch Channel[int]
+	ch.Publish(42)
+
+	last, _ := ch.Subscribe(make(chan int))
+
+	assert.Equal(t, 42, *last, "Expected last published value to be received")
 }

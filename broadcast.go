@@ -6,13 +6,15 @@ import "sync"
 type Channel[T any] struct {
 	lk        sync.Mutex
 	listeners []chan<- T
+	last      *T
 }
 
 // Subscribe is used to subscribe to the broadcast channel.
 // If the passed channel is full at any point, it will be dropped from subscription and closed.
 // To stop subscribing, either the closer function can be used or the channel can be abandoned.
 // Passing a channel multiple times to the Subscribe function will result in a panic.
-func (c *Channel[T]) Subscribe(ch chan<- T) (closer func()) {
+// If there were messages sent previously, it will return it
+func (c *Channel[T]) Subscribe(ch chan<- T) (last *T, closer func()) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
 	for _, exCh := range c.listeners {
@@ -22,7 +24,7 @@ func (c *Channel[T]) Subscribe(ch chan<- T) (closer func()) {
 	}
 	c.listeners = append(c.listeners, ch)
 
-	return func() {
+	return c.last, func() {
 		c.lk.Lock()
 		defer c.lk.Unlock()
 		for i, listener := range c.listeners {
@@ -48,6 +50,7 @@ func (c *Channel[T]) Publish(val T) {
 			delinquents = append(delinquents, ch)
 		}
 	}
+	c.last = &val
 	if len(delinquents) == 0 {
 		return
 	}
