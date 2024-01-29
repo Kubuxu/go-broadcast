@@ -119,7 +119,10 @@ func TestBackPressureWithMultipleReceivers(t *testing.T) {
 
 func TestSubscribeWithLastValue(t *testing.T) {
 	var ch Channel[int]
+	assert.Nil(t, ch.Last(), "After init Last should be nil")
 	ch.Publish(42)
+	assert.NotNil(t, ch.Last(), "After publish Last should not be nil")
+	assert.Equal(t, 42, *ch.Last(), "After publish Last should be set to correct value")
 
 	last, _ := ch.Subscribe(make(chan int))
 

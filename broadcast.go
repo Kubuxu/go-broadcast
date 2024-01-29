@@ -39,6 +39,10 @@ func (c *Channel[T]) Subscribe(ch chan<- T) (last *T, closer func()) {
 	}
 }
 
+func (c *Channel[T]) Last() *T {
+	return c.last
+}
+
 func (c *Channel[T]) Publish(val T) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
