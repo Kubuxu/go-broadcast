@@ -103,7 +103,7 @@ func TestBackPressureWithMultipleReceivers(t *testing.T) {
 	c2 := make(chan int)
 
 	ch.Subscribe(c1)
-	ch.Subscribe(c2)
+	_, closer2 := ch.Subscribe(c2)
 
 	ch.Publish(42)
 
@@ -115,6 +115,9 @@ func TestBackPressureWithMultipleReceivers(t *testing.T) {
 	// Check that c2 was closed due to backpressure
 	_, ok = <-c2
 	assert.False(t, ok, "Expected channel to be closed due to backpressure")
+
+	// Make sure calling the closer doesn't panic.
+	closer2()
 }
 
 func TestSubscribeWithLastValue(t *testing.T) {
