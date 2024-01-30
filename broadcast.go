@@ -2,10 +2,15 @@ package broadcast
 
 import "sync"
 
+type listener[T any] struct {
+	ch    chan<- T
+	index int
+}
+
 // Channel provides a broadcast channel semantics with closing of subscribers in case of back-pressure.
 type Channel[T any] struct {
 	lk        sync.Mutex
-	listeners []chan<- T
+	listeners []*listener[T]
 	last      *T
 }
 
@@ -17,24 +22,29 @@ type Channel[T any] struct {
 func (c *Channel[T]) Subscribe(ch chan<- T) (last *T, closer func()) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
-	for _, exCh := range c.listeners {
-		if exCh == ch {
+	for _, l := range c.listeners {
+		if l.ch == ch {
 			panic("channel passed multiple times to Subscribe()")
 		}
 	}
-	c.listeners = append(c.listeners, ch)
+	l := &listener[T]{ch: ch, index: len(c.listeners)}
+	c.listeners = append(c.listeners, l)
 
 	return c.last, func() {
 		c.lk.Lock()
 		defer c.lk.Unlock()
-		for i, listener := range c.listeners {
-			if listener == ch {
-				// Remove the channel from the slice without preserving the order
-				c.listeners[i] = c.listeners[len(c.listeners)-1]
-				c.listeners = c.listeners[:len(c.listeners)-1]
-				break
-			}
+
+		// Already removed.
+		if l.index < 0 {
+			return
 		}
+
+		ch := c.listeners[l.index].ch
+
+		lastIdx := len(c.listeners) - 1
+		c.listeners[l.index], c.listeners[lastIdx] = c.listeners[lastIdx], nil
+		c.listeners = c.listeners[:lastIdx]
+
 		close(ch)
 	}
 }
@@ -47,16 +57,19 @@ func (c *Channel[T]) Publish(val T) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
 	for i := 0; i < len(c.listeners); {
-		ch := c.listeners[i]
+		l := c.listeners[i]
 		select {
-		case ch <- val:
+		case l.ch <- val:
 			i++
 		default:
-			close(ch)
 			// Replace the current channel with the last one and try again.
 			lastIdx := len(c.listeners) - 1
+			c.listeners[lastIdx].index = i
 			c.listeners[i], c.listeners[lastIdx] = c.listeners[lastIdx], nil
 			c.listeners = c.listeners[:lastIdx]
+
+			close(l.ch)
+			l.index = -1
 		}
 	}
 
