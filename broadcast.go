@@ -32,10 +32,10 @@ func (c *Channel[T]) Subscribe(ch chan<- T) (last *T, closer func()) {
 				// Remove the channel from the slice without preserving the order
 				c.listeners[i] = c.listeners[len(c.listeners)-1]
 				c.listeners = c.listeners[:len(c.listeners)-1]
-				break
+				close(listener)
+				return
 			}
 		}
-		close(ch)
 	}
 }
 
