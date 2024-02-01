@@ -40,6 +40,8 @@ func (c *Channel[T]) Subscribe(ch chan<- T) (last *T, closer func()) {
 }
 
 func (c *Channel[T]) Last() *T {
+	c.lk.Lock()
+	defer c.lk.Unlock()
 	return c.last
 }
 
