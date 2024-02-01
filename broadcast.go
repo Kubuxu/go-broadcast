@@ -48,36 +48,19 @@ func (c *Channel[T]) Last() *T {
 func (c *Channel[T]) Publish(val T) {
 	c.lk.Lock()
 	defer c.lk.Unlock()
-	var delinquents []chan<- T
-	for _, ch := range c.listeners {
+	for i := 0; i < len(c.listeners); {
+		ch := c.listeners[i]
 		select {
 		case ch <- val:
+			i++
 		default:
-			delinquents = append(delinquents, ch)
+			close(ch)
+			// Replace the current channel with the last one and try again.
+			lastIdx := len(c.listeners) - 1
+			c.listeners[i], c.listeners[lastIdx] = c.listeners[lastIdx], nil
+			c.listeners = c.listeners[:lastIdx]
 		}
-	}
-	c.last = &val
-	if len(delinquents) == 0 {
-		return
 	}
 
-	// Remove delinquent channels in place
-	n := 0
-	for _, ch := range c.listeners {
-		isDelinquent := false
-		for _, dch := range delinquents {
-			if ch == dch {
-				isDelinquent = true
-				break
-			}
-		}
-		if !isDelinquent {
-			c.listeners[n] = ch
-			n++
-		}
-	}
-	for _, dch := range delinquents {
-		close(dch)
-	}
-	c.listeners = c.listeners[:n]
+	c.last = &val
 }
