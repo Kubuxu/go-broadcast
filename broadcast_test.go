@@ -131,3 +131,14 @@ func TestSubscribeWithLastValue(t *testing.T) {
 
 	assert.Equal(t, 42, last, "Expected last published value to be received")
 }
+
+func TestClose(t *testing.T) {
+	var ch Channel[int]
+	c1 := make(chan int, 1)
+
+	ch.Subscribe(c1)
+	ch.Close()
+	_, ok := <-c1
+	assert.False(t, ok)
+	assert.True(t, ch.IsClosed())
+}
